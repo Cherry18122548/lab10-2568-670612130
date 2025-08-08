@@ -1,22 +1,49 @@
 import { UserCard } from "../components/UserCard";
 import { cleanUser } from "../libs/CleanUser";
 import axios from "axios";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+interface IUser {
+  name: string;
+  email: string;
+  imgUrl: string;
+  address: string;
+}
+
 export default function RandomUserPage() {
-  const [users, setUsers] = useState("");
+  const [users, setUsers] = useState<IUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [genAmount, setGenAmount] = useState(1);
+
+  // โหลดค่า genAmount จาก localStorage (ถ้ามี) ตอน component mount
+  const [genAmount, setGenAmount] = useState<number>(() => {
+    const saved = localStorage.getItem("genAmount");
+    return saved ? Number(saved) : 1;
+  });
+
+  // เก็บ genAmount ลง localStorage ทุกครั้งที่ genAmount เปลี่ยน
+  useEffect(() => {
+    localStorage.setItem("genAmount", genAmount.toString());
+  }, [genAmount]);
 
   const generateBtnOnClick = async () => {
+    if (genAmount < 1) {
+      alert("กรุณากรอกจำนวนที่ถูกต้อง");
+      return;
+    }
     setIsLoading(true);
-    const resp = await axios.get(
-      `https://randomuser.me/api/?results=${genAmount}`
-    );
-    setIsLoading(false);
-    const users = resp.data.results;
-    //Your code here
-    //Process result from api response with map function. Tips use function from /src/libs/CleanUser
-    //Then update state with function : setUsers(...)
+    try {
+      const resp = await axios.get(
+        `https://randomuser.me/api/?results=${genAmount}`
+      );
+      const users = resp.data.results;
+      const cleanUsers = users.map(cleanUser);
+      setUsers(cleanUsers);
+    } catch (error) {
+      alert("เกิดข้อผิดพลาดในการเรียก API");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -28,17 +55,37 @@ export default function RandomUserPage() {
           className="form-control text-center"
           style={{ maxWidth: "100px" }}
           type="number"
-          onChange={(event: any) => setGenAmount(event.target.value)}
+          min={1}
           value={genAmount}
+          onChange={(e) => setGenAmount(Number(e.target.value))}
         />
-        <button className="btn btn-dark" onClick={generateBtnOnClick}>
+        <button
+          className="btn btn-dark"
+          onClick={generateBtnOnClick}
+          disabled={isLoading}
+        >
           Generate
         </button>
       </div>
+
       {isLoading && (
         <p className="display-6 text-center fst-italic my-4">Loading ...</p>
       )}
-      {users && !isLoading && users.map(/*code map rendering UserCard here */)}
+
+      {!isLoading && users.length === 0 && (
+        <p className="text-center fst-italic mt-4"></p>
+      )}
+
+      {!isLoading &&
+        users.map((user, index) => (
+          <UserCard
+            key={index}
+            name={user.name}
+            imgUrl={user.imgUrl}
+            address={user.address}
+            email={user.email}
+          />
+        ))}
     </div>
   );
 }
